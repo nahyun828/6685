@@ -1,0 +1,30 @@
+setwd("C://Users/JNH/Desktop/6685")
+
+library(ggplot2)
+
+#Basic box plot
+p <- ggplot(heteromanovanum, aes(x=Name, y=VAF, color=Variant)) + 
+  geom_boxplot()
+#Assign the gene name in assigned order
+q<-p + scale_x_discrete(limit = c("FBXW7",
+                                  "APC",
+                                  "ERBB3",
+                                  "KRAS",
+                                  "NSD1",
+                                  "PIK3CA",
+                                  "TP53",
+                                  "GRIN2D",
+                                  "SMAD4",
+                                  "PRKAR1A",
+                                  "MYCN",
+                                  "ZFHX3",
+                                  "KMT2D",
+                                  "MECOM",
+                                  "SMC3",
+                                  "APOB",
+                                  "PBRM1",
+                                  "PTPDC1",
+                                  "RFC1",
+                                  "UNCX"))
+q+scale_color_manual(values=c("brown2", "slateblue1", "navy","lightgreen","#1f78b4"))+
+  theme(axis.text.x = element_text(color = "grey20", size = 15, angle = 90, hjust = .5, vjust = .5, face = "plain"))
