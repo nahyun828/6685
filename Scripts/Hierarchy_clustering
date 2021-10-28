@@ -1,0 +1,21 @@
+setwd("C://Users/JNH/Desktop/6685")
+
+library(ggdendro)
+library(ggplot2)
+library(factoextra)
+library(RColorBrewer)
+
+#Load the matrix for 
+normalizedPCA = read.delim("log2all_notype.txt", row.names =1)
+normalizedPCA<-as.matrix(normalizedPCA)
+sampleDists <- dist(t(normalizedPCA),  method = "euclidean")
+#dissimilarity tree
+clusters=hclust(sampleDists)
+#cluster dendrogram
+fviz_dend(clusters, k = 5, horiz = FALSE,                 # Cut in five groups
+          cex = 2, lwd = 3,   # label size
+          k_colors = brewer.pal(n = 18, name = "Dark2"),
+          color_labels_by_k = TRUE,  # color labels by groups
+          ggtheme = theme_classic())     # Change theme
+a+theme(axis.text=element_text(size=12),
+        axis.title=element_text(size=14,face="bold"))
