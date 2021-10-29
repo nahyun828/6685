@@ -1,0 +1,29 @@
+setwd("C://Users/JNH/Desktop/6685")
+
+library(ComplexHeatmap)
+library(circlize)
+library(colorspace)
+library(GetoptLong)
+library(dendextend)
+
+#Load the data matrix
+raw1<-read.table("GSEA rna organoid confirm.txt",header=T, sep="\t")
+raw2<-read.table("GSEA rna methyl_overlapped.txt",header=T, sep="\t")
+
+row.names(raw1)<-raw1$NAME
+raw1<-raw1[,2:ncol(raw1)]
+raw1<-data.matrix(raw1)
+a<-Heatmap(raw1, name="mRNA expression", 
+        show_row_names = T, row_names_side = "right", show_column_names = FALSE,
+        column_title_side = "bottom",column_order = NULL, cluster_rows = FALSE, cluster_columns = FALSE,
+        column_dend_gp = gpar(lwd=2), column_names_gp = gpar(fontsize=5), row_names_gp = gpar(fontsize=8),
+        col = colorRamp2(c(-2,-1.2, 2), c("purple", "yellow", "orangered")))
+        
+row.names(raw2)<-raw2$NAME
+raw2<-raw2[,2:ncol(raw2)]
+raw2<-data.matrix(raw2)
+b<-Heatmap(raw2, name="Methylation", 
+        show_row_names = T, row_names_side = "right", show_column_names = FALSE,
+        column_title_side = "bottom",column_order = NULL, cluster_rows = FALSE, cluster_columns = FALSE,
+        column_dend_gp = gpar(lwd=2), column_names_gp = gpar(fontsize=5), row_names_gp = gpar(fontsize=8),
+        col = colorRamp2(c(-4, 0, 4), c("blue", "white", "orange")))
