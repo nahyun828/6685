@@ -26,16 +26,15 @@ resultdata = bitr(noeng, fromType="SYMBOL", toType="ENTREZID", OrgDb="org.Hs.eg.
 colnames(resultdata) <- c("","Gene_Name")
 write.csv(resultdata, paste0(src_dir,"/sorted Entrez.csv"), row.names=FALSE)
 
-# Reload the EntrezID list
+# Reload the annotated EntrezID list
 data <- read.csv(paste0(src_dir,"/sorted Entrez.csv"),stringsAsFactors = T,na.strings = NA,header = T)
 de <- data$Gene_Name
-# Change the ID to NCBI geneID 
-edo<-enrichDGN(de)
 
 # Reactome pathway over-presentation analysis
 x <- enrichPathway(de, organism = "human", pvalueCutoff = 0.05,
                    pAdjustMethod = "BH", qvalueCutoff = 0.2, minGSSize = 1,
                    maxGSSize = 500, readable = FALSE)
+# Change the ID to NCBI geneID 
 edox <- setReadable(x, 'org.Hs.eg.db', 'ENTREZID')
 
 # Visulization of Gene-Concept Network
