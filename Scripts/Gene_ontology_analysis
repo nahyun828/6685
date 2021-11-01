@@ -1,0 +1,44 @@
+src_dir <- c('C:/Users/JNH/Desktop/analysis/6685')
+
+library(tidyr)
+library(readxl)
+library(org.Hs.eg.db)
+library(ReactomePA)
+library(clusterProfiler)
+library(org.Hs.eg.db)
+library(DOSE)
+library(ggplot2)
+
+# Load the gene list
+src_file <- list.files(src_dir, pattern = "PC1.csv")     
+df_file <- as.data.frame(src_file, stringAsFactor = F)
+
+# Annotate the homo sapiens gene database
+Entrz <- org.Hs.eg.db
+input_table <- df_file %>%
+  separate(src_file, c("no_name", "genes"), "_")
+tbl <- read.csv(paste0(src_dir, "/", src_file[1]),
+                stringsAsFactors = T,
+                na.strings = NA,header = T)
+noeng <- gsub("`", "", tbl$Gene_Name)
+# Mapping the gene name to EntrezID
+resultdata = bitr(noeng, fromType="SYMBOL", toType="ENTREZID", OrgDb="org.Hs.eg.db")
+colnames(resultdata) <- c("","Gene_Name")
+write.csv(resultdata, paste0(src_dir,"/sorted Entrez.csv"), row.names=FALSE)
+
+# Reload the EntrezID list
+data <- read.csv(paste0(src_dir,"/sorted Entrez.csv"),stringsAsFactors = T,na.strings = NA,header = T)
+de <- data$Gene_Name
+# Change the ID to NCBI geneID 
+edo<-enrichDGN(de)
+
+# Reactome pathway over-presentation analysis
+x <- enrichPathway(de, organism = "human", pvalueCutoff = 0.05,
+                   pAdjustMethod = "BH", qvalueCutoff = 0.2, minGSSize = 1,
+                   maxGSSize = 500, readable = FALSE)
+edox <- setReadable(x, 'org.Hs.eg.db', 'ENTREZID')
+
+# Visulization of Gene-Concept Network
+# cnetplot with label category and gene name
+cnetplot(edox, categorySize="pvalue", node_label="all")
+
