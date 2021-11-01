@@ -1,0 +1,16 @@
+setwd("C://Users/JNH/Desktop/6685")
+
+library(ggpubr)
+
+# Load the AUC values of samples
+heteromanova<-read.table("target_drug.txt", header=T, sep="\t", na.strings = "NA", fill=T)
+heteromanovanum <- heteromanova[, 1:5]
+
+# Color by the sample type
+ggscatter(heteromanova, x = "Organoid", y = "Cell_line",
+          add = "reg.line",                         # Add regression line
+          conf.int = TRUE,                          # Add confidence interval
+          color = "Pair", palette = "jco",           # Color by groups "cyl"
+          shape = "Pair"                            # Change point shape by groups "cyl"
+)+
+  stat_cor(aes(color = Pair))                      # Add correlation coefficient
