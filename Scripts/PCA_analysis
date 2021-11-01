@@ -1,0 +1,20 @@
+setwd("C://Users/JNH/Desktop/6685")
+
+library(ggfortify)
+library(ggplot2)
+library(dplyr)
+library(ggthemes)
+
+normalizedPCA = read.delim("log2 tpm organoid.txt", row.names =1)
+t.normalizedPCA <- t(normalizedPCA)
+write.table(t.normalizedPCA, sep="\t", file="tPCAformat_20210826.txt", row.names=TRUE,col.names=TRUE,quote=FALSE)
+tt.normalizedPCA <- read.table("tPCAformat_20210826.txt",sep="\t", header=T)
+mt.normalizedPCA <- as.matrix(tt.normalizedPCA[, 1:35993])
+write.table(mt.normalizedPCA, sep="\t",file="normalized final_20210309.txt", row.names=TRUE,col.names=NA,quote=FALSE)
+head(mt.normalizedPCA)
+
+# PCA plot with label
+g1<-autoplot(prcomp(mt.normalizedPCA), data = tt.normalizedPCA, colour= 'Type', label=FALSE, label.size =5)
+
+# PCA plot theme
+g1 + theme_calc()+ scale_colour_calc()+theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
