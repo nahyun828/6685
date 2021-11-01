@@ -1,0 +1,22 @@
+setwd("C://Users/JNH/Desktop/6685")
+
+library(PCAtools)
+
+# Load TPM values
+mat = read.delim("log2 tpm organoid.txt", row.names = 1)
+
+# Load sample annotation file
+matadata1 = read.delim("metadata.txt", row.names = 1)
+colnames(matadata1) <- c('type')
+mat<-as.matrix(mat)
+metadata1<-as.data.frame(matadata1)
+mat <- mat[,which(colnames(mat) %in% rownames(metadata1))]
+all(colnames(mat) == rownames(metadata1))
+
+# PCA analysis
+p <- pca(mat, metadata = metadata1)
+
+# Extracting the contribution values 
+q<-p$loadings
+write.table(q, "log2 tpm loading organoid.txt", sep="\t")
+
