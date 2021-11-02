@@ -1,0 +1,17 @@
+setwd("C://Users/JNH/Desktop/6685")
+
+library(ComplexHeatmap)
+
+data1 = read.delim("methyl heatmap.txt",row.names = 1)
+
+# Compute the correlation matrix
+cormat <- round(cor(data1),2)
+cormat2 <-signif(cor(data1),2)
+head(cormat2)
+
+# Extract the value of Pearson correlation coeffcient 
+write.table(cormat2, "methylationcorrelation.txt", sep="\t")
+col<- colorRampPalette(c("seagreen", "white", "gold"))(20)
+
+# Visulaize the correlation matrix with heatmap
+heatmap(cormat2, col=col, symm=TRUE)
