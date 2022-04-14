@@ -1,0 +1,677 @@
+rm(list=ls())
+setwd("C://Users/BECAUSEWECAN/Desktop/MOFAexample")
+
+if (!requireNamespace("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+BiocManager::install("MOFAdata")
+
+BiocManager::install("MOFA2")
+BiocManager::install("MOFAdata")
+BiocManager::install("tidyverse")
+BiocManager::install("ggpubr")
+
+install.packages("remotes")
+remotes::install_github("bioFAM/MOFAdata")
+
+library(MOFA2)
+library(MOFAdata)
+library(data.table)
+library(ggplot2)
+library(tidyverse)
+library(ggpubr)
+
+
+##Example Inputs
+
+mydrug<-read.table("drug_SNU6685_dia.txt", header=T, sep="\t", na.strings = "NA", fill=T)
+row.names(mydrug)<-(mydrug$Name)
+mydrug<-as.matrix(mydrug[,2:ncol(mydrug)])
+is.matrix(mydrug)
+
+mymethyl<-read.table("methyl_SNU6685_dia.txt", header=T, sep="\t", na.strings = "NA")
+row.names(mymethyl)<-(mymethyl$Name)
+mymethyl<-as.matrix(mymethyl[,2:ncol(mymethyl)])
+is.matrix(mymethyl)
+
+mymRNA<-read.table("mRNA_SNU6685_dia_3.txt", header=T, sep="\t", na.strings = "NA")
+row.names(mymRNA)<-(mymRNA$Name)
+mymRNA<-as.matrix(mymRNA[,2:ncol(mymRNA)])
+is.matrix(mymRNA)
+
+myCNV<-read.table("CNV_SNU6685_dia_2.txt", header=T, sep="\t", na.strings = "NA")
+row.names(myCNV)<-(myCNV$Name)
+myCNV<-as.matrix(myCNV[,2:ncol(myCNV)])
+is.matrix(myCNV)
+
+mywb<-read.table("wb_SNU6685_dia.txt", header=T, sep="\t", na.strings = "NA")
+row.names(mywb)<-(mywb$Name)
+mywb<-as.matrix(mywb[,2:ncol(mywb)])
+is.matrix(mywb)
+
+mymut<-read.table("mut_SNU6685_dia.txt", header=T, sep="\t", na.strings = "NA")
+row.names(mymut)<-(mymut$Name)
+mymut<-as.matrix(mymut[,2:ncol(mymut)])
+is.matrix(mymut)
+ 
+wbinput=mywb, , methylinput=mymethyl
+
+total <- list(druginput=mydrug, mRNAinput=mymRNA, mutinput=mymut,CNVinput=myCNV)
+
+MOFAobject <- create_mofa(total)
+plot_data_overview(MOFAobject)
+data_opts <- get_default_data_options(MOFAobject)
+data_opts
+
+model_opts <- get_default_model_options(MOFAobject)
+model_opts$num_factors <- 10
+model_opts
+
+train_opts <- get_default_training_options(MOFAobject)
+train_opts$convergence_mode <- "fast"
+train_opts$seed <- 40
+train_opts
+
+MOFAobject <- prepare_mofa(MOFAobject,
+  data_options = data_opts,
+  model_options = model_opts,
+  training_options = train_opts
+)
+outfile = file.path(getwd(),"model.hdf5")
+MOFAobject.trained <- run_mofa(MOFAobject, use_basilisk = TRUE)
+
+
+######################training a model in R######################
+sample_metadata <-as.data.frame(read.table("otherinfo_SNU6685.txt", header=T, sep="\t", na.strings = "NA"))
+samples_metadata(MOFAobject.trained) <- sample_metadata
+head(samples_metadata(MOFAobject.trained), n=3)
+
+head(get_variance_explained(MOFAobject.trained)$r2_total[[1]])
+head(get_variance_explained(MOFAobject.trained)$r2_per_factor[[1]])
+plot_data_overview(MOFAobject.trained )
+dev.copy(tiff,"6685overview_210913.tiff",width=7, height=7, units="in",res=200) 
+dev.off() 
+
+plot_variance_explained(MOFAobject.trained , x="view", y="factor")
+dev.copy(tiff,"6685explained_210913.tiff",width=7, height=7, units="in",res=200) 
+dev.off() 
+
+plot_variance_explained(MOFAobject.trained , x="view", y="factor", plot_total = TRUE)[[2]]
+dev.copy(tiff,"6685explained2_210901.tiff",width=7, height=7, units="in",res=200) 
+dev.off() 
+
+plot_factor(MOFAobject.trained, 
+  factor = 1:5,
+  color_by = "THBS1",
+  shape_by = "chr8_12237172_12237302"
+)
+dev.copy(tiff,"ICG001_Drug_PRAMEF1_p.Met310Val_factor1_210913.tiff",width=7, height=7, units="in",res=200) 
+dev.off() 
+
+p <- plot_factor(MOFAobject.trained, 
+  factors = c(1,2,3,4,5),
+  color_by = "ITGB3BP_p.Arg10Gly",
+  dot_size = 3,        # change dot size
+  dodge = TRUE,           # dodge points with different colors
+  legend = FALSE,          # remove legend
+  add_violin = TRUE,      # add violin plots,
+  violin_alpha = 0.25  # transparency of violin plots
+)
+
+# The output of plot_factor is a ggplot2 object that we can edit
+p <- p + 
+  scale_color_manual(values=c("0"="black", "1"="red")) +
+  scale_fill_manual(values=c("0"="black", "1"="red"))
+
+print(p)
+
+dev.copy(tiff,"clonality_violin_210913.tiff",width=7, height=7, units="in",res=200) 
+dev.off() 
+
+plot_factors(MOFAobject.trained, 
+  factors = 1:3,
+  color_by = "Lymphnode_meta"
+)
+
+dev.copy(tiff,"invitrosub_multifactor_210913.tiff",width=9, height=7, units="in",res=200) 
+dev.off() 
+
+
+#The weights provide a score for how strong each feature relates to each factor. 
+#Features with no association with the factor have values close to zero, 
+#while features with strong association with the factor have large absolute values. 
+#The sign of the weight indicates the direction of the effect: a positive weight indicates 
+#that the feature has higher levels in the cells with positive factor values, and vice versa.
+
+total <- list(druginput=mydrug, mRNAinput=mymRNA, mutinput=mymut, wbinput=mywb, CNVinput=myCNV, methylinput=mymethyl)
+
+plot_top_weights(MOFAobject.trained,
+  view = "methylinput",
+  factor = 1,
+  nfeatures = 15
+)
+dev.copy(tiff,"methyl_factor2_rank_210913.tiff",width=7, height=7, units="in",res=200) 
+dev.off() 
+
+plot_weights(MOFAobject.trained,
+  view = "mutinput",
+  factor = 1,
+  nfeatures = 15,     # Number of features to highlight
+  scale = TRUE,          # Scale weights from -1 to 1
+  abs = FALSE             # Take the absolute value?
+)
+dev.copy(tiff,"wbinput_rank_210913.tiff",width=7, height=7, units="in",res=200) 
+dev.off() 
+
+plot_data_heatmap(MOFAobject.trained,
+  view = "druginput",         # view of interest
+  factor = 1,             # factor of interest
+  features = 50,          # number of features to plot (they are selected by weight)
+  
+  # extra arguments that are passed to the `pheatmap` function
+  cluster_rows = TRUE, cluster_cols = FALSE,
+  show_rownames = TRUE, show_colnames = FALSE
+)
+dev.copy(tiff,"wbfactor_rank_210913.tiff",width=7, height=7, units="in",res=200) 
+dev.off() 
+
+plot_data_scatter(MOFAobject.trained,
+  view = "druginput",         # view of interest
+  factor = 1,             # factor of interest
+  features = 12,           # number of features to plot (they are selected by weight)
+  add_lm = TRUE,          # add linear regression
+  color_by = "in_vitro_Subtype"
+)
+
+dev.copy(tiff,"drugfactor_factor1_210913.tiff",width=12, height=7, units="in",res=200) 
+dev.off() 
+
+
+
+##################################################
+#####Example from 26 breast cancer cell lines#####
+##################################################
+
+rm(list=ls())
+setwd("C://Users/BECAUSEWECAN/Desktop/breastcancer_MOFA")
+
+mydrug<-read.table("breast_drug.txt", header=T, sep="\t", na.strings = "NA", fill=T)
+row.names(mydrug)<-(mydrug$Name)
+mydrug<-as.matrix(mydrug[,2:ncol(mydrug)])
+is.matrix(mydrug)
+
+mymRNA<-read.table("breast_rna.txt", header=T, sep="\t", na.strings = "NA")
+row.names(mymRNA)<-(mymRNA$Name)
+mymRNA<-as.matrix(mymRNA[,2:ncol(mymRNA)])
+is.matrix(mymRNA)
+
+mymut<-read.table("breast_mut.txt", header=T, sep="\t", na.strings = "NA")
+row.names(mymut)<-(mymut$Name)
+mymut<-as.matrix(mymut[,2:ncol(mymut)])
+is.matrix(mymut)
+
+mywb<-read.table("breast_protein.txt", header=T, sep="\t", na.strings = "NA")
+row.names(mywb)<-(mywb$Name)
+mywb<-as.matrix(mywb[,2:ncol(mywb)])
+is.matrix(mywb)
+
+total <- list(druginput=mydrug, mRNAinput=mymRNA, mutinput=mymut, wbinput=mywb)
+
+MOFAobject <- create_mofa(total)
+plot_data_overview(MOFAobject)
+data_opts <- get_default_data_options(MOFAobject)
+data_opts
+
+model_opts <- get_default_model_options(MOFAobject)
+model_opts$num_factors <- 5
+model_opts
+
+train_opts <- get_default_training_options(MOFAobject)
+train_opts$convergence_mode <- "fast"
+train_opts$seed <- 40
+train_opts
+
+MOFAobject <- prepare_mofa(MOFAobject,
+  data_options = data_opts,
+  model_options = model_opts,
+  training_options = train_opts
+)
+outfile = file.path(getwd(),"breastmodel.hdf5")
+MOFAobject.trained <- run_mofa(MOFAobject, use_basilisk = TRUE)
+
+
+Nsamples = sum(get_dimensions(MOFAobject.trained)[["N"]])
+sample_metadata <-as.data.frame(read.table("breast_metadata.txt", header=T, sep="\t", na.strings = "NA"))
+samples_metadata(MOFAobject.trained) <- sample_metadata
+head(samples_metadata(MOFAobject.trained), n=3)
+
+head(get_variance_explained(MOFAobject.trained)$r2_total[[1]])
+head(get_variance_explained(MOFAobject.trained)$r2_per_factor[[1]])
+plot_data_overview(MOFAobject.trained )
+dev.copy(tiff,"breastoverview_210913.tiff",width=7, height=7, units="in",res=200) 
+dev.off() 
+
+plot_variance_explained(MOFAobject.trained , x="view", y="factor")
+dev.copy(tiff,"breastexplained_210913.tiff",width=7, height=7, units="in",res=200) 
+dev.off() 
+
+plot_variance_explained(MOFAobject.trained , x="view", y="factor", plot_total = TRUE)[[2]]
+dev.copy(tiff,"breastvolcano_210901.tiff",width=5.5, height=7, units="in",res=200) 
+dev.off() 
+
+plot_factor(MOFAobject.trained, 
+  factor = 1:5,
+  color_by = "Doubling_time",
+  shape_by = "in_vitro_Subtype"
+)
+dev.copy(tiff,"Doubling_time_in_vitro_Subtype_210913.tiff",width=7, height=7, units="in",res=200) 
+dev.off() 
+
+
+
+
+p <- plot_factor(MOFAobject.trained, 
+  factors = c(1,2,3,4,5),
+  color_by = "in_vitro_Subtype",
+  dot_size = 3,        # change dot size
+  dodge = TRUE,           # dodge points with different colors
+  legend = FALSE,          # remove legend
+  add_violin = TRUE,      # add violin plots,
+  violin_alpha = 0.25  # transparency of violin plots
+)
+
+# The output of plot_factor is a ggplot2 object that we can edit
+p <- p + 
+  scale_color_manual(values=c("ER-PR-HER2-"="black", "ER-PR-HER2+"="red", "ER+PR-HER2-"="blue", "ER+PR+HER2-"="green")) +
+  scale_fill_manual(values=c("ER-PR-HER2-"="black", "ER-PR-HER2+"="red", "ER+PR-HER2-"="blue", "ER+PR+HER2-"="green"))
+
+print(p)
+
+dev.copy(tiff,"age_invitrosub_violin_210913.tiff",width=7, height=7, units="in",res=200) 
+dev.off() 
+
+plot_factors(MOFAobject.trained, 
+  factors = 1:5,
+  color_by = "in_vitro_Subtype"
+)
+
+dev.copy(tiff,"invitrosub_multifactor_210913.tiff",width=9, height=7, units="in",res=200) 
+dev.off() 
+
+
+#The weights provide a score for how strong each feature relates to each factor. 
+#Features with no association with the factor have values close to zero, 
+#while features with strong association with the factor have large absolute values. 
+#The sign of the weight indicates the direction of the effect: a positive weight indicates 
+#that the feature has higher levels in the cells with positive factor values, and vice versa.
+
+list(druginput=mydrug, mRNAinput=mymRNA, mutinput=mymut, wbinput=mywb, CNVinput=myCNV, methylinput=mymethyl)
+
+
+plot_weights(MOFAobject.trained,
+  view = "methylinput",
+  factor = 1,
+  nfeatures = 20,     # Number of features to highlight
+  scale = TRUE,          # Scale weights from -1 to 1
+  abs = FALSE             # Take the absolute value?
+)
+dev.copy(tiff,"drugfactor_rank_210913.tiff",width=7, height=7, units="in",res=200) 
+dev.off() 
+
+plot_top_weights(MOFAobject.trained,
+  view = "methylinput",
+  factor = 1,
+  nfeatures = 15
+)
+dev.copy(tiff,"methylfactor_rank_210913.tiff",width=7, height=7, units="in",res=200) 
+dev.off() 
+
+
+plot_data_heatmap(MOFAobject.trained,
+  view = "methylinput",         # view of interest
+  factor = 1,             # factor of interest
+  features = 15,          # number of features to plot (they are selected by weight)
+  
+  # extra arguments that are passed to the `pheatmap` function
+  cluster_rows = TRUE, cluster_cols = FALSE,
+  show_rownames = TRUE, show_colnames = FALSE
+)
+dev.copy(tiff,"methylfactor_rank_heatmap_210913.tiff",width=7, height=7, units="in",res=200) 
+dev.off() 
+
+plot_data_scatter(MOFAobject.trained,
+  view = "methylinput",         # view of interest
+  factor = 1,             # factor of interest
+  features = 15,           # number of features to plot (they are selected by weight)
+  add_lm = TRUE,          # add linear regression
+  color_by = "Location"
+)
+
+dev.copy(tiff,"drugfactor_factor1_210913.tiff",width=12, height=7, units="in",res=200) 
+dev.off() 
+
+
+
+##################################################
+######Example from 28 lung cancer cell lines######
+##################################################
+
+rm(list=ls())
+setwd("C://Users/BECAUSEWECAN/Desktop/lungcancer_MOFA")
+
+mydrug<-read.table("lungdrug.txt", header=T, sep="\t", na.strings = "NA", fill=T)
+row.names(mydrug)<-(mydrug$Name)
+mydrug<-as.matrix(mydrug[,2:ncol(mydrug)])
+is.matrix(mydrug)
+
+mymRNA<-read.table("lungmRNA.txt", header=T, sep="\t", na.strings = "NA")
+row.names(mymRNA)<-(mymRNA$Name)
+mymRNA<-as.matrix(mymRNA[,2:ncol(mymRNA)])
+is.matrix(mymRNA)
+
+mymut<-read.table("lungmut.txt", header=T, sep="\t", na.strings = "NA")
+row.names(mymut)<-(mymut$Name)
+mymut<-as.matrix(mymut[,2:ncol(mymut)])
+is.matrix(mymut)
+
+mywb<-read.table("lungwb.txt", header=T, sep="\t", na.strings = "NA")
+row.names(mywb)<-(mywb$Name)
+mywb<-as.matrix(mywb[,2:ncol(mywb)])
+is.matrix(mywb)
+
+total <- list(druginput=mydrug, mRNAinput=mymRNA, mutinput=mymut, wbinput=mywb)
+groups = as.vector(t(read.table("grouplist.txt", header=T, sep="\t", na.strings = "NA")))
+#The aim of the multi-group framework is to identify the sources of variability *within* the groups. 
+#If your aim is to find a factor that 'separates' the groups, you DO NOT want to use the multi-group framework. 
+#Please see the FAQ in (https://biofam.github.io/MOFA2)
+
+MOFAobject <- create_mofa(total, groups=groups)
+plot_data_overview(MOFAobject)
+data_opts <- get_default_data_options(MOFAobject)
+data_opts
+
+model_opts <- get_default_model_options(MOFAobject)
+model_opts$num_factors <- 2
+model_opts
+
+train_opts <- get_default_training_options(MOFAobject)
+train_opts$convergence_mode <- "fast"
+train_opts$seed <- 40
+train_opts
+
+MOFAobject <- prepare_mofa(MOFAobject,
+  data_options = data_opts,
+  model_options = model_opts,
+  training_options = train_opts
+)
+outfile = file.path(getwd(),"breastmodel.hdf5")
+MOFAobject.trained <- run_mofa(MOFAobject, use_basilisk = TRUE)
+
+
+MOFAobject <- create_mofa(data, groups=groups)
+Nsamples = sum(get_dimensions(MOFAobject.trained)[["N"]])
+sample_metadata <-as.data.frame(read.table("otherinfo.txt", header=T, sep="\t", na.strings = "NA"))
+samples_metadata(MOFAobject.trained) <- sample_metadata
+head(samples_metadata(MOFAobject.trained), n=3)
+head(sample_metadata)
+
+head(get_variance_explained(MOFAobject.trained)$r2_total[[1]])
+head(get_variance_explained(MOFAobject.trained)$r2_per_factor[[1]])
+plot_data_overview(MOFAobject.trained )
+dev.copy(tiff,"lungoverview_210913.tiff",width=7, height=7, units="in",res=200) 
+dev.off() 
+
+plot_variance_explained(MOFAobject.trained , x="view", y="factor")
+dev.copy(tiff,"lungexplained_210913_grouped.tiff",width=7, height=7, units="in",res=200) 
+dev.off() 
+
+plot_variance_explained(MOFAobject.trained , x="view", y="factor", plot_total = TRUE)[[2]]
+dev.copy(tiff,"lungexplained_bar_210913.tiff",width=7, height=7, units="in",res=200) 
+dev.off() 
+
+plot_factor(MOFAobject.trained, 
+  factor = 1:2,
+  color_by = "Age",
+  shape_by = "group"
+)
+dev.copy(tiff,"Age_Group_210913.tiff",width=7, height=7, units="in",res=200) 
+dev.off() 
+
+
+p <- plot_factor(MOFAobject.trained, 
+  factors = c(1,2),
+  color_by = "group",
+  dot_size = 3,        # change dot size
+  dodge = TRUE,           # dodge points with different colors
+  legend = FALSE,          # remove legend
+  add_violin = TRUE,      # add violin plots,
+  violin_alpha = 0.25  # transparency of violin plots
+)
+
+# The output of plot_factor is a ggplot2 object that we can edit
+p <- p + 
+  scale_color_manual(values=c("EGFR"="black", "fusion"="red", "other"="blue")) +
+  scale_fill_manual(values=c("EGFR"="black", "fusion"="red", "other"="blue"))
+
+print(p)
+
+dev.copy(tiff,"group_violin_210913.tiff",width=7, height=7, units="in",res=200) 
+dev.off() 
+
+plot_factors(MOFAobject.trained, 
+  factors = 1:2,
+  color_by = "group"
+)
+
+dev.copy(tiff,"invitrosub_multifactor_210913.tiff",width=9, height=7, units="in",res=200) 
+dev.off() 
+
+
+#The weights provide a score for how strong each feature relates to each factor. 
+#Features with no association with the factor have values close to zero, 
+#while features with strong association with the factor have large absolute values. 
+#The sign of the weight indicates the direction of the effect: a positive weight indicates 
+#that the feature has higher levels in the cells with positive factor values, and vice versa.
+
+
+plot_weights(MOFAobject.trained,
+  view = "wbinput",
+  factor = 2,
+  nfeatures = 50,     # Number of features to highlight
+  scale = TRUE,          # Scale weights from -1 to 1
+  abs = FALSE             # Take the absolute value?
+)
+dev.copy(tiff,"lung_wbfactor2_rank_210913.tiff",width=7, height=7, units="in",res=200) 
+dev.off() 
+
+plot_top_weights(MOFAobject.trained,
+  view = "druginput",
+  factor = 1,
+  nfeatures = 10
+)
+
+
+
+
+plot_data_heatmap(MOFAobject.trained,
+  view = "mutinput",         # view of interest
+  factor = 2,             # factor of interest
+  features = 50,          # number of features to plot (they are selected by weight)
+  
+  # extra arguments that are passed to the `pheatmap` function
+  cluster_rows = TRUE, cluster_cols = FALSE,
+  show_rownames = TRUE, show_colnames = FALSE
+)
+dev.copy(tiff,"wbfactor_rank_210913.tiff",width=7, height=7, units="in",res=200) 
+dev.off() 
+
+plot_data_scatter(MOFAobject.trained,
+  view = "druginput",         # view of interest
+  factor = 1,             # factor of interest
+  features = 4,           # number of features to plot (they are selected by weight)
+  add_lm = TRUE,          # add linear regression
+  color_by = "group"
+)
+
+dev.copy(tiff,"drugfactor_factor1_210913.tiff",width=12, height=7, units="in",res=200) 
+dev.off() 
+
+##########################################################################################
+##################################################
+#####Example from 18 crc o cancer cell lines#####
+##################################################
+
+setwd("C://Users/BECAUSEWECAN/Desktop/crc_organoid_MOFA")
+
+mydrug<-read.table("drug_crco_mofa.txt", header=T, sep="\t", na.strings = "NA", fill=T)
+row.names(mydrug)<-(mydrug$Name)
+mydrug<-as.matrix(mydrug[,2:ncol(mydrug)])
+is.matrix(mydrug)
+
+mymRNA<-read.table("mRNA_crco_mofa.txt", header=T, sep="\t", na.strings = "NA")
+row.names(mymRNA)<-(mymRNA$Name)
+mymRNA<-as.matrix(mymRNA[,2:ncol(mymRNA)])
+is.matrix(mymRNA)
+
+myCNV<-read.table("cnv_crco_mofa.txt", header=T, sep="\t", na.strings = "NA")
+row.names(myCNV)<-(myCNV$Name)
+myCNV<-as.matrix(myCNV[,2:ncol(myCNV)])
+is.matrix(myCNV)
+
+mywb<-read.table("wb_crco_mofa.txt", header=T, sep="\t", na.strings = "NA")
+row.names(mywb)<-(mywb$Name)
+mywb<-as.matrix(mywb[,2:ncol(mywb)])
+is.matrix(mywb)
+
+total <- list(druginput=mydrug, mRNAinput=mymRNA, cnvinput=myCNV, wbinput=mywb)
+
+MOFAobject <- create_mofa(total)
+plot_data_overview(MOFAobject)
+data_opts <- get_default_data_options(MOFAobject)
+data_opts
+
+model_opts <- get_default_model_options(MOFAobject)
+model_opts$num_factors <- 3
+model_opts
+
+train_opts <- get_default_training_options(MOFAobject)
+train_opts$convergence_mode <- "fast"
+train_opts$seed <- 40
+train_opts
+
+MOFAobject <- prepare_mofa(MOFAobject,
+  data_options = data_opts,
+  model_options = model_opts,
+  training_options = train_opts
+)
+outfile = file.path(getwd(),"model.hdf5")
+MOFAobject.trained <- run_mofa(MOFAobject, use_basilisk = TRUE)
+
+MOFAobject.trained
+head(get_variance_explained(MOFAobject.trained)
+######################training a model in R######################
+sample_metadata <-as.data.frame(read.table("otherinfo_crco.txt", header=T, sep="\t", na.strings = "NA"))
+samples_metadata(MOFAobject.trained) <- sample_metadata
+head(samples_metadata(MOFAobject.trained), n=3)
+
+head(get_variance_explained(MOFAobject.trained)$r2_total[[1]])
+head(get_variance_explained(MOFAobject.trained)$r2_per_factor[[1]])
+plot_data_overview(MOFAobject.trained )
+dev.copy(tiff,"6685overview_210913.tiff",width=7, height=7, units="in",res=200) 
+dev.off() 
+
+plot_variance_explained(MOFAobject.trained , x="view", y="factor")
+dev.copy(tiff,"6685explained_210913.tiff",width=7, height=7, units="in",res=200) 
+dev.off() 
+
+plot_variance_explained(MOFAobject.trained , x="view", y="factor", plot_total = TRUE)[[2]]
+dev.copy(tiff,"6685explained2_210901.tiff",width=7, height=7, units="in",res=200) 
+dev.off() 
+
+plot_factor(MOFAobject.trained, 
+  factor = 1:5,
+  color_by = "THBS1",
+  shape_by = "chr8_12237172_12237302"
+)
+dev.copy(tiff,"ICG001_Drug_PRAMEF1_p.Met310Val_factor1_210913.tiff",width=7, height=7, units="in",res=200) 
+dev.off() 
+
+
+
+
+p <- plot_factor(MOFAobject.trained, 
+  factors = c(1,2,3,4,5),
+  color_by = "ITGB3BP_p.Arg10Gly",
+  dot_size = 3,        # change dot size
+  dodge = TRUE,           # dodge points with different colors
+  legend = FALSE,          # remove legend
+  add_violin = TRUE,      # add violin plots,
+  violin_alpha = 0.25  # transparency of violin plots
+)
+
+# The output of plot_factor is a ggplot2 object that we can edit
+p <- p + 
+  scale_color_manual(values=c("0"="black", "1"="red")) +
+  scale_fill_manual(values=c("0"="black", "1"="red"))
+
+print(p)
+
+dev.copy(tiff,"clonality_violin_210913.tiff",width=7, height=7, units="in",res=200) 
+dev.off() 
+
+plot_factors(MOFAobject.trained, 
+  factors = 1:3,
+  color_by = "Lymphnode_meta"
+)
+
+dev.copy(tiff,"invitrosub_multifactor_210913.tiff",width=9, height=7, units="in",res=200) 
+dev.off() 
+
+
+#The weights provide a score for how strong each feature relates to each factor. 
+#Features with no association with the factor have values close to zero, 
+#while features with strong association with the factor have large absolute values. 
+#The sign of the weight indicates the direction of the effect: a positive weight indicates 
+#that the feature has higher levels in the cells with positive factor values, and vice versa.
+
+total <- list(druginput=mydrug, mRNAinput=mymRNA, mutinput=mymut, wbinput=mywb, CNVinput=myCNV, methylinput=mymethyl)
+
+plot_top_weights(MOFAobject.trained,
+  view = "wbinput",
+  factor = 2,
+  nfeatures = 15
+)
+dev.copy(tiff,"methyl_factor2_rank_210913.tiff",width=7, height=7, units="in",res=200) 
+dev.off() 
+
+plot_weights(MOFAobject.trained,
+  view = "mutinput",
+  factor = 1,
+  nfeatures = 15,     # Number of features to highlight
+  scale = TRUE,          # Scale weights from -1 to 1
+  abs = FALSE             # Take the absolute value?
+)
+dev.copy(tiff,"wbinput_rank_210913.tiff",width=7, height=7, units="in",res=200) 
+dev.off() 
+
+plot_data_heatmap(MOFAobject.trained,
+  view = "druginput",         # view of interest
+  factor = 1,             # factor of interest
+  features = 50,          # number of features to plot (they are selected by weight)
+  
+  # extra arguments that are passed to the `pheatmap` function
+  cluster_rows = TRUE, cluster_cols = FALSE,
+  show_rownames = TRUE, show_colnames = FALSE
+)
+dev.copy(tiff,"wbfactor_rank_210913.tiff",width=7, height=7, units="in",res=200) 
+dev.off() 
+
+plot_data_scatter(MOFAobject.trained,
+  view = "druginput",         # view of interest
+  factor = 1,             # factor of interest
+  features = 12,           # number of features to plot (they are selected by weight)
+  add_lm = TRUE,          # add linear regression
+  color_by = "in_vitro_Subtype"
+)
+
+dev.copy(tiff,"drugfactor_factor1_210913.tiff",width=12, height=7, units="in",res=200) 
+dev.off() 
